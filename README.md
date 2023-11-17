@@ -9,8 +9,18 @@
 
 
 ## Introduction:
-My master thesis in computer science is related to the implementation of a parallel clustering methodology, the Parallel Flexible Clustering algorithm. This concurrent version is based on the FISHDBC algorithm, originally implemented by the Professor Dell'Amico. As the FISHDBC, also the Parallel Flexible Clustering strictly depends on some main data structures and methods: the HNSW, a graph-based data structure used in approximate nearest neighbor search; the MST, a tree that spans all the vertices in the graph while minimizing the total weight of the edges; the HDBSCAN clustering, designed to perform robust clustering of data points based on their density. The main task of the thesis is to try to parallelize such FISHDBC algorithm to reduce the final execution time, after a careful analysis of the original single process algorithm and after a meticulous study of the concepts upon which it is based. My contribution allows to obtain a lock-free working parallel solution, without locks because we are talking about an approximated algorithm, thus it is possible to avoid the usage of a synchronization system, saving time and resources. But with my parallel implementation we can also obtain a correct version of only the HNSW data structure in a fast way. 
-
+The thesis presents the parallelisation of a state-of-the art clustering algorithm, FISHDBC.
+This objective has been achived by improving the main data structures and components of
+the algorithm: HNSW, a graph-based data structure used in approximate nearest neighbor
+search; MST, a tree that spans all the vertices in the graph while minimizing the total
+weight of the edges; the HDBSCAN clustering, designed to perform robust clustering of
+data points based on their density. My contribution is based on a lock-free strategy,
+made feasible because FISHDBC provides an approximated solution, and provides good
+performance figures. It is worth to note that the Parallel Flexible Clustering algorithm is
+completely wrote in Python, without dependencies to other languages. This represents an
+important feature making it user friendly and highly customisable, considering that user
+defined distance metrics for computing similarity among data are mostly written in this
+language
 
 ## Project Structure:
 
