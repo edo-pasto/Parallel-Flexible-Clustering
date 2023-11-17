@@ -32,21 +32,25 @@ language
 
 │   ├── parallel_flexible_clustering
 
-│       ├── __init__.py
+│   │    ├── __init__.py
 
-│       ├── create_text_dataset.py
+│   │    ├── create_text_dataset.py
 
-│       ├── parallel_fishdbc_example.py
+│   │    ├── parallel_fishdbc_example.py
     
-│       ├── fishdbc.py
+│   │    ├── fishdbc.py
 
-│       ├── hnsw_parallel.py
+│   │    ├── hnsw_parallel.py
 
-│       ├── hnsw.py
+│   │    ├── hnsw.py
 
-│       ├── parallel_hnsw_example.py
+│   │    ├── parallel_hnsw_example.py
 
-│       ├── unionfind.c
+│   │     unionfind.c
+
+│   ├── setup.cfg 
+
+│    setup.py 
 
 ```
 
