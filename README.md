@@ -26,7 +26,7 @@ My master thesis in computer science is related to the implementation of a paral
 
 │       ├── create_text_dataset.py
 
-│       ├── fishdbc_example.py
+│       ├── parallel_fishdbc_example.py
     
 │       ├── fishdbc.py
 
@@ -34,7 +34,7 @@ My master thesis in computer science is related to the implementation of a paral
 
 │       ├── hnsw.py
 
-│       ├── test_parallel_HNSW.py
+│       ├── parallel_hnsw_example.py
 
 │       ├── unionfind.c
 
