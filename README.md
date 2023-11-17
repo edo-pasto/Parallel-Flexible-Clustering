@@ -50,10 +50,6 @@ language
 
 ```
 
-- **`parallel-flexible-clustering-master`**,  , 
-
-- **`parallel_flexible_clustering`**,  (*`__init__.py`*, *`create_text_dataset.py`*, *`parallel_fishdbc_example.py`*, *`fishdbc.py`*, *`hnsw_parallel.py`*, *`hnsw.py`*, *`test_parallel_HNSW`*, *`unionfind.c`*  and *`unionfind.pyx`*).
-
 ## Insallation & Execution:
 
 In this appendix section we will see some basic instructions to install everything you need to execute the FISHDBC algorithm on a Linux machine.
@@ -97,22 +93,22 @@ python3 fishdbc_example.py --dataset blob --nitems 10000 --centers 5 --distance 
 where you can specify the data set that you want to use as input (blob or text), the number of items of the input data set (--nitems), the numbers of the data set's centroids (--centers), depending on the type of data the distance to be used (the available distances are: euclidean, sqeuclidean, minkowski, cosine and levenshtein for text data) and the number of processes to use (--parallel 0 means original single process FISHDBC, --parallel > 0 means multi process, you can pass from 1 to 16 processes).    
 If you want to execute the parallel FISHDBC with text data as input you can write:
 ```
-python3 fishdbc_example.py --dataset text --distance levenshtein --nitems 1000 --centers 10 --parallel 16
+python3 parallel_fishdbc_example.py --dataset text --distance levenshtein --nitems 1000 --centers 10 --parallel 16
 ```
 If, instead, you desire to execute the original single process FISHDBC you can also write:
 ```
-python3 fishdbc_example.py --dataset blob --nitems 1000 --centers 5 --distance euclidean 
+python3 parallel_fishdbc_example.py --dataset blob --nitems 1000 --centers 5 --distance euclidean 
 ```
 It is possible to take a look at the accuracy of the final parallel (but also the single process) FISHDBC clustering enabling the --test option:
 ```
-python3 fishdbc_example.py --dataset blob --nitems 10000 --centers 5 --distance euclidean --parallel 16 --test True
+python3 parallel_fishdbc_example.py --dataset blob --nitems 10000 --centers 5 --distance euclidean --parallel 16 --test True
 ```
 There is also the opportunity to execute an example of only the parallel HNSW creation (again with the possibility to perform some accuracy tests thank to the --test True option):
 ```
-python3 test_parallel_HNSW.py --dataset blob --distance euclidean --parallel 16 --nitems 10000 --centers 5
+python3 parallel_hnsw_example.py --dataset blob --distance euclidean --parallel 16 --nitems 10000 --centers 5
 ```
 Of course you can execute the parallel HNSW also for textual data (but in this case you cannot perform any kind of test)
 ```
-python3 test_parallel_HNSW.py --dataset text --distance levenshtein --nitems 1000 --centers 10 --parallel 16
+python3 parallel_hnsw_example.py --dataset text --distance levenshtein --nitems 1000 --centers 10 --parallel 16
 ```
 
