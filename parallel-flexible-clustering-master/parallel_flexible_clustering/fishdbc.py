@@ -129,8 +129,8 @@ class FISHDBC:
                 return dist
 
             # used for testing the quality of search results
-            # def calc_dist(i, j):
-            #     return np.linalg.norm(i - data[j])
+            def calc_dist(i, j):
+                 return np.linalg.norm(i - data[j])
 
         else:  # d is defined to work on a scalar and a list
 
