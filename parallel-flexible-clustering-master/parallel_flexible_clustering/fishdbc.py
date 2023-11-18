@@ -32,7 +32,6 @@ import heapq
 import hdbscan
 import numpy as np
 import scipy.sparse
-from scipy.sparse.csgraph import minimum_spanning_tree
 from hdbscan import hdbscan_
 from . import hnsw
 from .unionfind import UnionFind
