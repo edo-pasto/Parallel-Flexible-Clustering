@@ -204,7 +204,7 @@ if __name__ == "__main__":
         # if dist == 'hamming':
         #     def calc_dist(x,y):
         #         return distance.hamming(x,y)
-        if dist == "levensthein":
+        if dist == "levenshtein":
 
             def calc_dist(x, y):
                 return lev(x, y)
@@ -212,7 +212,7 @@ if __name__ == "__main__":
         else:
             raise EnvironmentError(
                 "At the moment the specified distance is not available for the string dataset,"
-                " try with: levensthein"
+                " try with: levenshtein"
             )
     else:
         raise EnvironmentError(
