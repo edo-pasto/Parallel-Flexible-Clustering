@@ -46,7 +46,7 @@ with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='flexible_clustering',
+    name='parallel_flexible_clustering',
 
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
@@ -135,7 +135,7 @@ setup(
 #        ],
 #    },
     
-    ext_modules = cythonize("flexible_clustering/unionfind.pyx"),
+    ext_modules = cythonize("parallel_flexible_clustering/unionfind.pyx"),
     include_dirs=[numpy.get_include()],
 )
 
