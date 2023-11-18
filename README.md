@@ -92,7 +92,7 @@ python3 setup.py install
 Now we will see how to execute experiments of the algorithm launching the fishdbc\_example.py file.
 If you want to execute a classical run of the parallel FISHDBC you should type:
 ```
-python3 fishdbc_example.py --dataset blob --nitems 10000 --centers 5 --distance euclidean --parallel 16
+python3 parallel_fishdbc_example.py --dataset blob --nitems 10000 --centers 5 --distance euclidean --parallel 16
 ```
 where you can specify the data set that you want to use as input (blob or text), the number of items of the input data set (--nitems), the numbers of the data set's centroids (--centers), depending on the type of data the distance to be used (the available distances are: euclidean, sqeuclidean, minkowski, cosine and levenshtein for text data) and the number of processes to use (--parallel 0 means original single process FISHDBC, --parallel > 0 means multi process, you can pass from 1 to 16 processes).    
 If you want to execute the parallel FISHDBC with text data as input you can write:
