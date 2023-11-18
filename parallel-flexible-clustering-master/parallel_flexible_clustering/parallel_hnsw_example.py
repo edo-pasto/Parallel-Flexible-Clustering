@@ -4,7 +4,7 @@ import argparse
 from numba import njit
 from scipy.spatial import distance, KDTree
 from Levenshtein import distance as lev
-from flexible_clustering import hnsw_parallel
+from parallel_flexible_clustering import hnsw_parallel
 import create_text_dataset
 import sklearn.datasets
 from sklearn.neighbors import KDTree
