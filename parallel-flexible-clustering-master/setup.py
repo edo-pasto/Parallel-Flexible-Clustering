@@ -53,15 +53,15 @@ setup(
     # https://packaging.python.org/en/latest/single_source_version.html
     version='0.1.0',
 
-    description='Flexible Clustering',
+    description='Parallel Flexible Clustering',
     long_description=long_description,
 
     # The project's main homepage.
     #url='https://github.com/pypa/sampleproject',
 
     # Author details
-    author="Matteo Dell'Amico",
-    author_email='matteo_dellamico@symantec.com',
+    author="Edoardo Pastorino, Matteo Dell'Amico, Daniele D'Agostino",
+    author_email='5169595@studenti.unige.com, matteo_dellamico@symantec.com, daniele.dagostino@unige.it',
 
     # Choose your license
     license='BSD 3-clause',
