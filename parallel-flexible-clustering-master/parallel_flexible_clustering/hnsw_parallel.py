@@ -23,7 +23,73 @@ MISSING = sys.maxsize
 MISSING_WEIGHT = sys.float_info.max
 
 
-class HNSW:
+class PARALLEL_HNSW:
+    """Parallel Hierarchical Navigable Small World (HNSW) data structure.
+    Based on the work by Yury Malkov and Dmitry Yashunin, available at
+    http://arxiv.org/pdf/1603.09320v2.pdf
+    HNSWs allow performing approximate nearest neighbor search with
+    arbitrary data and non-metric dissimilarity functions, in a parallel way.
+
+    Attributes
+    ----------
+    distance : func
+        the dissimilarity function
+    data: list
+        the input data
+    members: list[list]
+        structure for describing how each level of the HNSW is composed
+    levels: list[tuple]
+        structure for describing at what level each element is originally assigned
+    positions: list[dict]
+        structure for describing at which position in each level an element can be found
+    shm_adj: shared memory
+        shared memory associated to the shared array of nodes of the HNSW structure
+    shm_weights: shared memory
+        shared memory associated to the shared array of weights of the HNSW structure
+    shm_hnsw_data: shared memory
+        shared memory to tack track of the added element to the HNSW structure
+    shm_enter_point: shared memory
+        shared memory associated to the enter point to start the search for the hnsw add procedure
+    shm_count: shared memory
+        shared memory associated to the count for counting how much call to the distance function we make
+    lock: Lock
+    m : int, optional
+        the number of each element's neighbros at the level > 0, default 5
+    ef : int, optional
+        number of closest neighbors of the inserted element in the layer, default 32
+    m0 : int, optional
+        the max number of each element's neighbors at the level 0, default None
+
+    Methods
+    -------
+    decorated_d(distance_cache, i, j)
+        compute the distance value bewteen two points and save it in the cache
+    add_and_compute_local_mst(points)
+        starts the add procedure of a range of points for each process
+    hnsw_add(elem, ef=None)
+        add an element to the HNSW data structure
+    calc_position(to_find, level_to_search)
+        find the position of a specific element inside a specific level in the HNSW structure
+    calc_level(elem)
+        find the belonging level of an element
+    search(graphs, q, k=None, ef=None, test=False)
+        search a query element in the HNSW graph
+    _search_graph_ef1(count_dist, level_to_search, q, entry, dist, arr_adj, shm_adj, distance_cache)
+        search the candidates to be linked to the new inserted element when ef = 1 
+    _search_graph(count_dist, level_to_search, q, ep, arr_adj, shm_adj, distance_cache, m, ef,)
+        search the candidates to be linked to the new inserted element 
+    _search_graph_ef1_test(q, entry, dist, g)
+        as the _search_graph_ef1, but used when accuracy test are performed
+    _search_graph_test(q, ep, g, ef)
+        as the _search_graph, but used when accuracy test are performed
+    _select_heuristic(level_to_search, position, elem, to_insert, m, arr_adj, arr_weights, shm_adj, shm_weights, heap=False)
+        link the new element to the existing items inside the HNSW, thanks to an heuristic
+    local_mst(distances, points)
+        compute the MST, locally to each process 
+    global_mst(candidate_edges, n)
+        compute the global MST with all the previous local MSTs
+    """
+
     def __init__(
         self,
         distance,
@@ -41,6 +107,38 @@ class HNSW:
         ef=32,
         m0=None,
     ):
+        
+        """
+        Parameters
+        ----------
+        distance : func
+            the dissimilarity function
+        data: list
+            the input data
+        members: list[list]
+            structure for describing how each level of the HNSW is composed
+        levels: list[tuple]
+            structure for describing at what level each element is originally assigned
+        positions: list[dict]
+            structure for describing at which position in each level an element can be found
+        shm_adj: shared memory
+            shared memory associated to the shared array of nodes of the HNSW structure
+        shm_weights: shared memory
+            shared memory associated to the shared array of weights of the HNSW structure
+        shm_hnsw_data: shared memory
+            shared memory to tack track of the added element to the HNSW structure
+        shm_enter_point: shared memory
+            shared memory associated to the enter point to start the search for the hnsw add procedure
+        shm_count: shared memory
+            shared memory associated to the count for counting how much call to the distance function we make
+        lock: Lock
+        m : int, optional
+            the number of each element's neighbros at the level > 0, default 5
+        ef : int, optional
+            number of closest neighbors of the inserted element in the layer, default 32
+        m0 : int, optional
+            the max number of each element's neighbors at the level 0, default None
+        """
         self.data = data
         self.dim = len(data)
         self.distance = distance
@@ -89,12 +187,44 @@ class HNSW:
         self.lock = lock
 
     def decorated_d(self, distance_cache, i, j):
+        """Compute the distance bewteen i and j and save its value in the i's cache
+        
+        Parameters
+        ----------
+        distance_cache : dict
+            cache of the distances computed between the element i and the others elements
+        i : int
+            the first element to be part of the distance computation
+        j : int
+            the second element to be part of the distance computation
+
+        Returns
+        -------
+        dist : int
+            the computed distance value
+        """
         if j in distance_cache:
             return distance_cache[j]
         distance_cache[j] = dist = self.distance(self.data[i], self.data[j])
         return dist
 
     def add_and_compute_local_mst(self, points):
+        """for each process, add a range of input elements in the HNSW structure and computes the local MST
+        
+        Parameters
+        ----------
+        points : list[int]
+            cache of the distances computed between the element i and the others elements
+
+        Returns
+        -------
+        local_mst : list[tuple]
+            the computed distance value
+        time_MST : float
+            the time spent by the local mst computation
+        time_HNSW : float
+            the time spent by the partial HNSW computation
+        """
         distances = []
         time_HNSW = 0
         start = time.time()
@@ -110,6 +240,18 @@ class HNSW:
         return local_mst, time_localMST, time_HNSW
 
     def hnsw_add(self, elem):
+        """for each process, add a range of input elements in the HNSW structure and computes the local MST
+        
+        Parameters
+        ----------
+        elem : int
+            the element to be inserted in the HNSW structure
+
+        Returns
+        -------
+        distance_cache : dict
+            the distance cache of the element
+        """
         distance_cache = {}
         level = self.calc_level(elem)
         """Add elem to the data structure"""
@@ -172,7 +314,6 @@ class HNSW:
                         g1,
                         sh1,
                         distance_cache,
-                        level_m,
                     )
                     level_to_search_pos = level_to_search_pos - 1
             # at these levels we have to insert elem; ep is a heap of
@@ -220,7 +361,6 @@ class HNSW:
                 self._select_heuristic(
                     level_to_search_pos,
                     pos,
-                    idx,
                     ep,
                     level_m,
                     g1,
@@ -237,7 +377,6 @@ class HNSW:
                     self._select_heuristic(
                         level_to_search_pos,
                         pos2,
-                        j,
                         (idx, dist),
                         level_m,
                         g1,
@@ -256,31 +395,35 @@ class HNSW:
 
         return distance_cache
 
-    def printResult(self, shm_adj, shm_weights, members):
-        adjs = []
-        weights = []
-        for shm1, shm2, memb, i in zip(
-            shm_adj, shm_weights, members, range(len(members))
-        ):
-            adj = np.ndarray(
-                shape=(len(memb), self._m0 if i == 0 else self._m),
-                dtype=int,
-                buffer=shm1.buf,
-            )
-            adjs.append(adj)
-            weight = np.ndarray(
-                shape=(len(memb), self._m0 if i == 0 else self._m),
-                dtype=float,
-                buffer=shm2.buf,
-            )
-            weights.append(weight)
-        print("weights: ", weights, "\n")
-        print("Adjacency: ", adjs, "\n")
-
     def calc_position(self, to_find, level_to_search):
+        """Function to find the position of an element in a specific level using the position structure
+
+        Parameters
+        ----------
+        to_find : int
+            element for which we want to find its position in the HNSW structure
+        level_to_search : 
+            level in which we want ot find the element
+        
+        Returns
+        -------
+        the found position of the element at the specific level
+        """
         return self.positions[level_to_search].get(to_find)
 
     def calc_level(self, elem):
+        """Function to find the assigned level of an element
+        Parameters
+        ----------
+        to_find : int
+            element for which we want to find its position in the HNSW structure
+        level_to_search : 
+            level in which we want ot find the element
+        
+        Returns
+        -------
+        the found position of the element at the specific level
+        """
         for dic, i in zip(
             reversed(self.positions), reversed(range(len(self.positions)))
         ):
@@ -288,7 +431,23 @@ class HNSW:
                 return i + 1
 
     def search(self, graphs, q, k=None, ef=None):
-        """Find the k points closest to q."""
+        """Find the k points closest to q.
+        
+        Parameters
+        ----------
+        graphs: list[dict]
+            the graph representing the HNSW structure
+        q : int
+            the element for which find its k closest point
+        k : int, optional
+            the number of closest neighbors to find, default None
+        ef : int, optional
+            number of closest neighbors of the inserted element in the layer, default None
+
+        Returns
+        -------
+            the found K neighbors
+        """
 
         d = self.distance
         graphs = graphs
@@ -315,7 +474,27 @@ class HNSW:
         return [(idx, -md) for md, idx in ep]
 
     def _search_graph_ef1_test(self, q, entry, dist, g):
-        """Equivalent to _search_graph when ef=1."""
+        """Equivalent to _search_graph_test when ef=1 used when we want to perform the accuracy test
+
+        Parameters
+        ----------
+        q : int
+            the element for which find its candidates to be linked to it
+        entry : int
+            the entry point from which starts the search fo the candidates
+        dist : func
+            the distance function
+        g : dict
+            the current level we are processing
+        
+        Returns
+        -------
+        best : int
+            the best found neighbor of element
+        best_dist : float
+            the related distance of the best neighbor
+
+        """
 
         d = self.distance
         data = self.data
@@ -342,6 +521,28 @@ class HNSW:
         return best, best_dist
 
     def _search_graph_test(self, q, ep, g, ef):
+        """Function used to find the candidates neighbors 
+        of the element to be linked with the real ef value 
+        when we want to perform the accuracy test
+
+        Parameters
+        ----------
+        q : int
+            the element for which find its candidates to be linked to it
+        ep : heap
+            the heap of entry points from which starts the search fo the candidates
+        dist : func
+            the distance function
+        g : dict
+            the current level we are processing
+        ef : int
+            number of closest neighbors of the inserted element in the layer, default None
+
+        Returns
+        -------
+        ep : heap 
+            the heap containing the found candidates of the element
+        """
         d = self.distance
         data = self.data
 
@@ -383,8 +584,36 @@ class HNSW:
         arr_adj,
         shm_adj,
         distance_cache,
-        m,
     ):
+        """Equivalent to _search_graph when ef=1.
+
+        Parameters
+        ----------
+        count_dist : shared memory
+            counter for counting the number of call to the distance
+        level_to_search : int
+            level to search the neighbor of the elem
+        q : int
+            the element for which find its candidates to be linked to it
+        entry : int
+            the entry point from which starts the search fo the candidates
+        dist : func
+            the distance function
+        arr_adj : shared numpy array
+            the current shared array of the nodes in level we are processing
+       shm_adj : shared memory
+            the current shared memoryassociated to the shared array of the nodes
+       distance_cache : dict
+            cache of the distances computed between the element i and the others elements
+        
+        Returns
+        -------
+        best : int
+            the best found neighbor of element
+        best_dist : float
+            the related distance of the best neighbor
+
+        """
         g_adj = np.ndarray(shape=arr_adj.shape, dtype=int, buffer=shm_adj.buf)
         d = self.distance
         data = self.data
@@ -431,6 +660,37 @@ class HNSW:
         m,
         ef,
     ):
+        """Function used to find the candidates neighbors 
+        of the element to be linked with the real ef value.
+
+        Parameters
+        ----------
+        count_dist : shared memory
+            counter for counting the number of call to the distance
+        level_to_search : int
+            level to search the neighbor of the elem
+        q : int
+            the element for which find its candidates to be linked to it
+        ep : heap
+            the heap of entry points from which starts the search fo the candidates
+        dist : func
+            the distance function
+        arr_adj : shared numpy array
+            the current shared array of the nodes in level we are processing
+        shm_adj : shared memory
+            the current shared memory associated to the shared array of the nodes
+        distance_cache : dict
+            cache of the distances computed between the element i and the others elements
+        m : int, optional
+            the number of each element's neighbros at the level > 0, default 5
+        ef : int, optional
+            number of closest neighbors of the inserted element in the layer
+    
+        Returns
+        -------
+        ep : heap 
+            the heap containing the found candidates of the element
+        """
         g_adj = np.ndarray(shape=(len(arr_adj), m), dtype=int, buffer=shm_adj.buf)
 
         d = self.distance
@@ -470,45 +730,10 @@ class HNSW:
 
         return ep
 
-    def _select_naive(self, d, to_insert, m, g, heap=False):
-        if not heap:  # shortcut when we've got only one thing to insert
-            idx, dist = to_insert
-            assert idx not in d
-            if len(d) < m:
-                d[idx] = dist
-            else:
-                max_idx, max_dist = max(d.items(), key=itemgetter(1))
-                if dist < max_dist:
-                    del d[max_idx]
-                    d[idx] = dist
-            return
-
-        # so we have more than one item to insert, it's a bit more tricky
-        assert not any(idx in d for _, idx in to_insert)
-        to_insert = nlargest(m, to_insert)  # smallest m distances
-        unchecked = m - len(d)
-        assert 0 <= unchecked <= m
-        to_insert, checked_ins = to_insert[:unchecked], to_insert[unchecked:]
-        to_check = len(checked_ins)
-        if to_check > 0:
-            checked_del = nlargest(to_check, d.items(), key=itemgetter(1))
-        else:
-            checked_del = []
-        for md, idx in to_insert:
-            d[idx] = -md
-        zipped = zip(checked_ins, checked_del)
-        for (md_new, idx_new), (idx_old, d_old) in zipped:
-            if d_old <= -md_new:
-                break
-            del d[idx_old]
-            d[idx_new] = -md_new
-            assert len(d) == m
-
     def _select_heuristic(
         self,
         level_to_search,
         position,
-        elem,
         to_insert,
         m,
         arr_adj,
@@ -517,6 +742,30 @@ class HNSW:
         shm_weights,
         heap=False,
     ):
+        """Function to select and link the right neighbors
+        to the current element to be inserted, with the usage of a heuristic.
+
+        Parameters
+        ----------
+        level_to_search : int
+            level to search the neighbor of the elem
+        position : int
+            the position of the element in the considered level
+        to_insert: heap
+            heap of elements to be linked
+        m : int
+            the number of each element's neighbros 
+        arr_adj : shared numpy array
+            the current shared array of the nodes in level we are processing
+        arr_weights : shared numpy array
+            the current shared array of the weights in level we are processing
+        shm_adj : shared memory
+            the current shared memory associated to the shared array of the nodes
+        shm_weights : shared memory
+            the current shared memory associated to the shared array of the weights
+        heap: bool, optional
+            true if you have more than one element to insert, false otherwise. it's a shortcut when we've got only one thing to insert
+        """
         g_adj = np.ndarray(shape=arr_adj.shape, dtype=int, buffer=shm_adj.buf)
         g_weights = np.ndarray(
             shape=arr_weights.shape, dtype=float, buffer=shm_weights.buf
@@ -598,8 +847,22 @@ class HNSW:
                     g_weights[position][i] = abs(d_new)
                     break
 
-
     def local_mst(self, distances, points):
+        """Function that computes the local mst of each process, 
+        based on the distance caches associated to its range of points
+
+        Parameters
+        ----------
+        distances : list[dict]
+            element for which we want to find its position in the HNSW structure
+        points : 
+            the range of points for which we have to calculate the local mst
+        
+        Returns
+        -------
+        mst_edges : list[tuple]
+            the mst edges, namely the local mst
+        """
         shared_weights = []
         shared_adjs = []
         for i in range(len(self.members)):
@@ -642,8 +905,22 @@ class HNSW:
                 mst_edges.append((mrd, i, j, dist))
         return mst_edges
 
-    def global_mst(self, shm_adj, shm_weights, candidate_edges, n):
-        needed_edges = len(self.data) - 1
+    def global_mst(self, candidate_edges, n):
+        """Function that computes the global MST, 
+        based on the previous computed local MSTs
+
+        Parameters
+        ----------
+        candidates_edges : list[tuple]
+           the candidate edges for the global mst, namely the partial local MST
+        n : int
+            the size used by the kruskal UnionFind 
+        
+        Returns
+        -------
+        final_mst : list[tuple]
+            the final mst
+        """
         uf = UnionFind(n)
         final_mst = []
         candidate_edges.sort()

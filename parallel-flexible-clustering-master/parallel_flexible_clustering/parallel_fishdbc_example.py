@@ -29,7 +29,17 @@
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-# import timeit
+
+"""This script runs an example of the parallel FISHDBC example,
+but you can also run the classical original single pricess FISHDBC.
+
+Functions:
+
+    * plot_cluster_result - plot the clustering result
+    * split - split the dataset in a number of ranges as the number of processes
+    * main - the main function of the scripts that, if you execute it, starts or the parallel FISHDBC or the single process FISHDBC
+"""
+
 import numpy as np
 import pandas as pd
 import argparse
@@ -118,6 +128,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     def plot_cluster_result(size, ctree, x, y, labels):
+        """Function to generate a centroid for the text dataset generation
+        Parameters
+        ----------
+        size: int
+            the size of the dataset
+        ctree : 
+            the condensed tree of the hiererchical clustering
+        labels : list
+            the labels of the resulting hiererchical clustering
+
+        """
         plt.figure(figsize=(9, 9))
         plt.gca().set_aspect("equal")
         nknown = (
@@ -150,6 +171,18 @@ if __name__ == "__main__":
             plt.draw()
 
     def split(a, n):
+        """Function used to split the input data in a number of range as the number of used processes
+
+        Parameters
+        ----------
+        a : list
+            the list of input data points
+        n : 
+            the number of processes
+        Returns
+        -------
+            the splitted range of points
+        """
         k, m = divmod(len(a), n)
         indices = [k * i + min(i, m) for i in range(n + 1)]
         return [a[l:r] for l, r in pairwise(indices)]
@@ -294,7 +327,7 @@ if __name__ == "__main__":
         manager = multiprocessing.Manager()
         lock = manager.Lock()
 
-        hnswPar = hnsw_parallel.HNSW(
+        hnswPar = hnsw_parallel.PARALLEL_HNSW(
             calc_dist,
             data,
             members,
@@ -366,7 +399,7 @@ if __name__ == "__main__":
         fishdbcPar = fishdbc.FISHDBC(
             calc_dist, m, m0, vectorized=False, balanced_add=False
         )
-        final_mst = hnswPar.global_mst(shm_adj, shm_weights, partial_mst, len(data))
+        final_mst = hnswPar.global_mst(partial_mst, len(data))
         end = time.time()
         time_globalMST = end - start
         print(

@@ -57,6 +57,32 @@ class HNSW(object):
     http://arxiv.org/pdf/1603.09320v2.pdf
     HNSWs allow performing approximate nearest neighbor search with
     arbitrary data and non-metric dissimilarity functions.
+
+    Attributes
+    ----------
+    d : func
+        the dissimilarity function
+    vectorized : bool, optional
+        If vectorized is true, d can be called on lists as second argument to compare multiple elements with the first.
+    See other attributes in http://arxiv.org/pdf/1603.09320v2.pdf
+
+    Methods
+    -------
+    add(elem, ef=None)
+        add an element to the HNSW data structure
+    balance_add(elem, ef=None)
+        add an element to the HNSW data structure in a more balanced version
+    search(self, graphs, q, k=None, ef=None, test=False)
+        search a query element in the HNSW graph
+    _search_graph_ef1(self, q, entry, dist, g, test=False)
+        search the candidates to be linked to the new inserted element when ef = 1 
+    _search_graph(self, q, ep, g, ef, test=False)
+        search the candidates to be linked to the new inserted element 
+    _select_naive(self, d, to_insert, m, g, heap=False)
+        links the new element to the existing items inside the HNSW, in a naive way
+    _select_heuristic(self, d, to_insert, m, g, heap=False)
+        link the new element to the existing items inside the HNSW, thanks to an heuristic
+        
     """
 
     # self._graphs[level][i] contains a {j: dist} dictionary,
@@ -73,10 +99,15 @@ class HNSW(object):
         heuristic=True,
         vectorized=False,
     ):
-        """d the dissimilarity function
-        If vectorized is true, d can be called on lists as second argument
-        to compare multiple elements with the first.
-        See other parameters in http://arxiv.org/pdf/1603.09320v2.pdf"""
+        """
+        Parameters
+        ----------
+        d : func
+            the dissimilarity function
+        vectorized : bool, optional
+            If vectorized is true, d can be called on lists as second argument to compare multiple elements with the first.
+        See other parameters in http://arxiv.org/pdf/1603.09320v2.pdf
+        """
 
         self.data = []
 
@@ -115,7 +146,15 @@ class HNSW(object):
         self._select = self._select_heuristic if heuristic else self._select_naive
 
     def add(self, elem, ef=None):
-        """Add elem to the data structure"""
+        """Add elem to the data structure
+        
+        Parameters
+        ----------
+        elem : int
+            the element to be adde to the HNSW data structure
+        ef : int, optional
+            number of closest neighbors of the inserted element in the layer, default None
+        """
 
         if ef is None:
             ef = self._ef
@@ -168,6 +207,13 @@ class HNSW(object):
         Rather than choosing randomly the level of an element, an
         element is raised to a higher level if its degree is m and
         no neighbor is in the higher level.
+
+        Parameters
+        ----------
+        elem : int
+            the element to be adde to the HNSW data structure
+        ef : int, optional
+            number of closest neighbors of the inserted element in the layer, default None
         """
 
         if ef is None:
@@ -215,7 +261,25 @@ class HNSW(object):
         self._enter_point = idx
 
     def search(self, graphs, q, k=None, ef=None, test=False):
-        """Find the k points closest to q."""
+        """Find the k points closest to q.
+        
+        Parameters
+        ----------
+        graphs: list[dict]
+            the graph representing the HNSW structure
+        q : int
+            the element for which find its k closest point
+        k : int, optional
+            the number of closest neighbors to find, default None
+        ef : int, optional
+            number of closest neighbors of the inserted element in the layer, default None
+        test : bool, optional
+            used to specify if you are doing some accuracy test or not, default False
+        
+        Returns
+        -------
+            the found K neighbors.
+        """
 
         if test == True:
             d = self.distance_test
@@ -247,7 +311,21 @@ class HNSW(object):
         return [(idx, -md) for md, idx in ep]
 
     def _search_graph_ef1(self, q, entry, dist, g, test=False):
-        """Equivalent to _search_graph when ef=1."""
+        """Equivalent to _search_graph when ef=1.
+
+        Parameters
+        ----------
+        q : int
+            the element for which find its candidates to be linked to it
+        entry : int
+            the entry point from which starts the search fo the candidates
+        dist : func
+            the distance function
+        g : dict
+            the current level we are processing
+        test : bool, optional
+            used to specify if you are doing some accuracy test or not, default False
+        """
         if test == True:
             vd = self.vectorized_distance_test
         else:
@@ -276,6 +354,29 @@ class HNSW(object):
         return best, best_dist
 
     def _search_graph(self, q, ep, g, ef, test=False):
+        """Function used to find the candidates neighbors 
+        of the element to be linked with the real ef value.
+
+        Parameters
+        ----------
+        q : int
+            the element for which find its candidates to be linked to it
+        ep : heap
+            the heap of entry points from which starts the search fo the candidates
+        dist : func
+            the distance function
+        g : dict
+            the current level we are processing
+        ef : int
+            number of closest neighbors of the inserted element in the layer, default None
+        test : bool, optional
+            used to specify if you are doing some accuracy test or not, default False
+
+        Returns
+        -------
+        ep : heap 
+            the heap containing the found candidates of the element
+        """
         if test == True:
             vd = self.vectorized_distance_test
 
@@ -313,6 +414,22 @@ class HNSW(object):
         return ep
 
     def _select_naive(self, d, to_insert, m, g, heap=False):
+        """Function to select and link the right neighbors
+        to the current element to be inserted, in a naive way.
+
+        Parameters
+        ----------
+        d : func
+            the distance function
+        to_insert: heap
+            heap of elements to be linked
+        m : int
+            the number of each element's neighbros at the level > 0
+        g : dict
+            the current level we are processing
+        heap: bool, optional
+            true if you have more than one element to insert, false otherwise. it's a shortcut when we've got only one thing to insert
+        """
         if not heap:  # shortcut when we've got only one thing to insert
             idx, dist = to_insert
             assert idx not in d
@@ -347,6 +464,23 @@ class HNSW(object):
             assert len(d) == m
 
     def _select_heuristic(self, d, to_insert, m, g, heap=False):
+        """Function to select and link the right neighbors
+        to the current element to be inserted, with the usage of a heuristic.
+
+        Parameters
+        ----------
+        d : func
+            the distance function
+        to_insert: heap
+            heap of elements to be linked
+        m : int
+            the number of each element's neighbros at the level > 0
+        g : dict
+            the current level we are processing
+        heap: bool, optional
+            true if you have more than one element to insert, false otherwise. it's a shortcut when we've got only one thing to insert
+        
+        """
 
         nb_dicts = [g[idx] for idx in d]
 

@@ -1,3 +1,10 @@
+
+"""This script runs an example of the only parallel HNSW example,
+
+Functions:
+    * split - split the dataset in a number of ranges as the number of processes
+    * main - the main function of the scripts that, if you execute it, starts or the parallel HNSW
+"""
 import numpy as np
 import sys
 import argparse
@@ -28,6 +35,18 @@ MISSING_WEIGHT = sys.float_info.max
 
 
 def split(a, n):
+    """Function used to split the input data in a number of range as the number of used processes
+
+    Parameters
+    ----------
+    a : list
+        the list of input data points
+    n : 
+        the number of processes
+    Returns
+    -------
+        the splitted range of points
+    """
     k, m = divmod(len(a), n)
     indices = [k * i + min(i, m) for i in range(n + 1)]
     return [a[l:r] for l, r in pairwise(indices)]

@@ -72,7 +72,47 @@ def hnsw_hdbscan(
 
 
 class FISHDBC:
-    """Flexible Incremental Scalable Hierarchical Density-Based Clustering."""
+    """Class that represents the Flexible Incremental Scalable Hierarchical Density-Based Clustering.
+
+    Attributes
+    ----------
+    d : func
+        the dissimilarity function
+    min_samples : int, optional
+        controls the minimum number of samples in a neighborhood for a point to be considered a core point, default 5
+    m : int, optional
+        the number of each element's neighbros at the level > 0, default 5
+    ef : int, optional
+        number of closest neighbors of the inserted element in the layer
+    m0 : int, optional
+        the max number of each element's neighbors at the level 0, default None
+    level_mult : bool, optional
+        specify the level multiplier to normalize the probability to assign an element to a layer, default False
+    heuristic : bool, optional
+        used to enable the select_heuristic funtion instead of the select_naive function, default False
+    balanced_add : bool, optional
+        used to enable the balance_add function instead of the classical add function, default False
+    vectorized: bool, optional
+        used to vectorize the computation of the distance function, default False
+
+    Methods
+    -------
+    add(elem)
+        Prints the animals name and what sound it makes
+    update(elems, mst_update_rate=1000000)
+        Start the add procedure and the MST computation
+    update_mst()
+        Compute and update the MST
+    cluster(
+        mst=None,
+        min_cluster_size=None,
+        cluster_selection_method="eom",
+        allow_single_cluster=False,
+        match_reference_implementation=False,
+        parallel=False
+    )
+        Performs the HDBSCAN clustering
+    """
 
     def __init__(
         self,
@@ -88,7 +128,32 @@ class FISHDBC:
     ):
         """Setup the algorithm. The only mandatory parameter is d, the
         dissimilarity function. min_samples is passed to hdbscan, and
-        the other parameters are all passed to HNSW."""
+        the other parameters are all passed to HNSW.
+
+        The decorated_d internal function is used to compute the distance between element 
+        but also to save distance values in cache
+
+        Parameters
+        ----------
+        d : func
+            the dissimilarity function
+        min_samples : int, optional
+            controls the minimum number of samples in a neighborhood for a point to be considered a core point, default 5
+        m : int, optional
+            the number of each element's neighbros at the level > 0, default 5
+        ef : int, optional
+            number of closest neighbors of the inserted element in the layer
+        m0 : int, optional
+            the max number of each element's neighbors at the level 0, default None
+        level_mult : bool, optional
+          specify the level multiplier to normalize the probability to assign an element to a layer, default False
+        heuristic : bool, optional
+            used to enable the select_heuristic funtion instead of the select_naive function, default False
+        balanced_add : bool, optional
+            used to enable the balance_add function instead of the classical add function, default False
+        vectorized: bool, optional
+            used to vectorize the computation of the distance function, default False
+        """
         self.distance = d
         self.min_samples = min_samples
 
@@ -164,7 +229,13 @@ class FISHDBC:
         return len(self.data)
 
     def add(self, elem):
-        """Add elem to the data structure."""
+        """Function to add elem to the data structure.
+
+        Parameters
+        ----------
+        elem: int
+            the element to add both to the hnsw and the data we are clustering
+        """
 
         data = self.data
         distance_cache = self._distance_cache
@@ -215,9 +286,16 @@ class FISHDBC:
         # print("hnsw graphs", self.the_hnsw._graphs)
 
     def update(self, elems, mst_update_rate=100000):
-        """Add elements from elems and update the MST.
+        """Function to add elements from elems and update the MST.
         To avoid clogging memory, the MST is updated every
         mst_update_rate elements are added.
+
+        Parameters
+        ----------
+        elems:
+             the list of elements to add to the hnsw and to the data we are clustering
+        mst_update_rate: int
+             update  the mst every mst_update_rate
         """
 
         for i, elem in enumerate(elems):
@@ -233,8 +311,10 @@ class FISHDBC:
         self._tot_MST_time = self._tot_MST_time + (end - start)
 
     def update_mst(self):
-        """Update the minimum spanning tree."""
-
+        """Function to update the minimum spanning tree.
+        It computes the MST using the candidate edges 
+        and performing the kruskal algorithm
+        """
         new_edges = self._new_edges
 
         if len(new_edges) == 0:
@@ -271,7 +351,34 @@ class FISHDBC:
         match_reference_implementation=False,
         parallel=False,
     ):
-        """Returns: (labels, probs, stabilities, condensed_tree, slt, mst)."""
+        """
+        Parameters
+        ----------
+        mst: np array
+            the mst to be used as input for clustering, default None
+        min_cluster_size: int
+             controls the minimum number of samples in a neighborhood for a point to be considered a core point, default None
+        cluster_selection_method: str
+            used to extract a flat clustering from the hierarchical clustering, default eom
+        allow_single_cluster: bool
+           use it if you are getting lots of small clusters, but believe there should be some larger scale structure, default False
+        match_reference_implementation: bool
+            default False
+        parallel: bool
+            use it to specify if you are executing your fishdbc algorithm in parallel or in single process, default False
+
+        Returns
+        -------
+        lps (labels, probs, stabilities): tuple of 3 arrays
+            labels indicate which cluster a data point belongs to; 
+            probs provide probability estimates for each cluster assignment;
+            stabilities indicate how robust the cluster assignments are for each data point;
+        condensed_tree:
+            a numpy array representing the cluster resulting dendogram
+        slt: unknown
+        mst: numpy array
+            the mst used for clustering
+        """
 
         if min_cluster_size is None:
             min_cluster_size = self.min_samples
