@@ -69,9 +69,9 @@ def gen_dataset(
     centroid_size: int
         the length of the centroid string
     samples_per_cluster: int
-        the number of element that belongs to each cluster
+        the number of elements that belongs to each cluster
     n_edits: int
-        the number of allowed to modify the original string
+        the number of allowed edits to modify the original string
 
     Returns
     -------
@@ -105,7 +105,7 @@ def gen_labels(n_centroids: int, samples_per_cluster: int):
     Returns
     -------
     res: list[int]
-        the arrays of the leabels of each element of the text dataset
+        the arrays of the leabels of the text dataset
     """
     labels = []
     for i in range(n_centroids):

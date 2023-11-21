@@ -79,7 +79,7 @@ class HNSW(object):
     _search_graph(self, q, ep, g, ef, test=False)
         search the candidates to be linked to the new inserted element 
     _select_naive(self, d, to_insert, m, g, heap=False)
-        links the new element to the existing items inside the HNSW, in a naive way
+        link the new element to the existing items inside the HNSW, in a naive way
     _select_heuristic(self, d, to_insert, m, g, heap=False)
         link the new element to the existing items inside the HNSW, thanks to an heuristic
         
@@ -151,9 +151,9 @@ class HNSW(object):
         Parameters
         ----------
         elem : int
-            the element to be adde to the HNSW data structure
+            the element to be added to the HNSW data structure
         ef : int, optional
-            number of closest neighbors of the inserted element in the layer, default None
+            number of candidates closest neighbors of the inserted element in the layer, default None
         """
 
         if ef is None:
@@ -213,7 +213,7 @@ class HNSW(object):
         elem : int
             the element to be adde to the HNSW data structure
         ef : int, optional
-            number of closest neighbors of the inserted element in the layer, default None
+            number of the candidate closest neighbors of the inserted element in the layer, default None
         """
 
         if ef is None:
@@ -268,11 +268,11 @@ class HNSW(object):
         graphs: list[dict]
             the graph representing the HNSW structure
         q : int
-            the element for which find its k closest point
+            the element for which find its k closest points
         k : int, optional
             the number of closest neighbors to find, default None
         ef : int, optional
-            number of closest neighbors of the inserted element in the layer, default None
+            number of candidates closest neighbors of the inserted element in the layer, default None
         test : bool, optional
             used to specify if you are doing some accuracy test or not, default False
         
@@ -316,9 +316,9 @@ class HNSW(object):
         Parameters
         ----------
         q : int
-            the element for which find its candidates to be linked to it
+            the element for which find its candidates that will be linked to it
         entry : int
-            the entry point from which starts the search fo the candidates
+            the entry point from which starts the search of the candidates
         dist : func
             the distance function
         g : dict
@@ -355,14 +355,14 @@ class HNSW(object):
 
     def _search_graph(self, q, ep, g, ef, test=False):
         """Function used to find the candidates neighbors 
-        of the element to be linked with the real ef value.
+        of the element to be linked with the elem.
 
         Parameters
         ----------
         q : int
-            the element for which find its candidates to be linked to it
+            the element for which find its candidates that will be linked to it
         ep : heap
-            the heap of entry points from which starts the search fo the candidates
+            the heap of entry points from which starts the search of the candidates
         dist : func
             the distance function
         g : dict
@@ -422,9 +422,9 @@ class HNSW(object):
         d : func
             the distance function
         to_insert: heap
-            heap of elements to be linked
+            heap of elements to be linked to the cuurent element
         m : int
-            the number of each element's neighbros at the level > 0
+            the number of each element's neighbors
         g : dict
             the current level we are processing
         heap: bool, optional
@@ -472,9 +472,9 @@ class HNSW(object):
         d : func
             the distance function
         to_insert: heap
-            heap of elements to be linked
+            heap of elements to be linked to the current element
         m : int
-            the number of each element's neighbros at the level > 0
+            the max number of each element's neighbors 
         g : dict
             the current level we are processing
         heap: bool, optional

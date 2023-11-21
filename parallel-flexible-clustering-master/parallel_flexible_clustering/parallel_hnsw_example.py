@@ -2,6 +2,7 @@
 """This script runs an example of the only parallel HNSW example,
 
 Functions:
+
     * split - split the dataset in a number of ranges as the number of processes
     * main - the main function of the scripts that, if you execute it, starts or the parallel HNSW
 """

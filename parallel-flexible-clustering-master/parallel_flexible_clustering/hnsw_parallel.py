@@ -47,47 +47,48 @@ class PARALLEL_HNSW:
     shm_weights: shared memory
         shared memory associated to the shared array of weights of the HNSW structure
     shm_hnsw_data: shared memory
-        shared memory to tack track of the added element to the HNSW structure
+        shared memory to take track of the added element to the HNSW structure
     shm_enter_point: shared memory
         shared memory associated to the enter point to start the search for the hnsw add procedure
     shm_count: shared memory
         shared memory associated to the count for counting how much call to the distance function we make
     lock: Lock
+        the lock used to synchronize the access and modification of the shared enter point
     m : int, optional
-        the number of each element's neighbros at the level > 0, default 5
+        the number of each element's neighbors at the level > 0, default 5
     ef : int, optional
-        number of closest neighbors of the inserted element in the layer, default 32
+        number of candidates closest neighbors of the inserted element in the layer, default 32
     m0 : int, optional
         the max number of each element's neighbors at the level 0, default None
 
     Methods
     -------
     decorated_d(distance_cache, i, j)
-        compute the distance value bewteen two points and save it in the cache
+        computes the distance value bewteen two points and save it into the cache
     add_and_compute_local_mst(points)
         starts the add procedure of a range of points for each process
     hnsw_add(elem, ef=None)
-        add an element to the HNSW data structure
+        adds an element to the HNSW data structure
     calc_position(to_find, level_to_search)
-        find the position of a specific element inside a specific level in the HNSW structure
+        finds the position of a specific element inside a specific level in the HNSW structure
     calc_level(elem)
-        find the belonging level of an element
+        finds the belonging level of an element
     search(graphs, q, k=None, ef=None, test=False)
-        search a query element in the HNSW graph
+        searches a query element in the HNSW graph
     _search_graph_ef1(count_dist, level_to_search, q, entry, dist, arr_adj, shm_adj, distance_cache)
-        search the candidates to be linked to the new inserted element when ef = 1 
+        searches the candidates to be linked to the new inserted element when ef = 1 
     _search_graph(count_dist, level_to_search, q, ep, arr_adj, shm_adj, distance_cache, m, ef,)
-        search the candidates to be linked to the new inserted element 
+        searches the candidates to be linked to the new inserted element 
     _search_graph_ef1_test(q, entry, dist, g)
         as the _search_graph_ef1, but used when accuracy test are performed
     _search_graph_test(q, ep, g, ef)
         as the _search_graph, but used when accuracy test are performed
     _select_heuristic(level_to_search, position, elem, to_insert, m, arr_adj, arr_weights, shm_adj, shm_weights, heap=False)
-        link the new element to the existing items inside the HNSW, thanks to an heuristic
+        links the new element to the existing items inside the HNSW, thanks to an heuristic
     local_mst(distances, points)
-        compute the MST, locally to each process 
+        computes the MST, locally to each process 
     global_mst(candidate_edges, n)
-        compute the global MST with all the previous local MSTs
+        computes the global MST with all the previous local MSTs
     """
 
     def __init__(
@@ -132,8 +133,9 @@ class PARALLEL_HNSW:
         shm_count: shared memory
             shared memory associated to the count for counting how much call to the distance function we make
         lock: Lock
+            the lock used to synchronize the access and modification of the shared enter point
         m : int, optional
-            the number of each element's neighbros at the level > 0, default 5
+            the number of each element's neighbors at the level > 0, default 5
         ef : int, optional
             number of closest neighbors of the inserted element in the layer, default 32
         m0 : int, optional
@@ -240,7 +242,7 @@ class PARALLEL_HNSW:
         return local_mst, time_localMST, time_HNSW
 
     def hnsw_add(self, elem):
-        """for each process, add a range of input elements in the HNSW structure and computes the local MST
+        """add the elem to the HNSW data structure
         
         Parameters
         ----------
@@ -403,7 +405,7 @@ class PARALLEL_HNSW:
         to_find : int
             element for which we want to find its position in the HNSW structure
         level_to_search : 
-            level in which we want ot find the element
+            level in which we want to search the element
         
         Returns
         -------
@@ -413,16 +415,15 @@ class PARALLEL_HNSW:
 
     def calc_level(self, elem):
         """Function to find the assigned level of an element
+
         Parameters
         ----------
-        to_find : int
-            element for which we want to find its position in the HNSW structure
-        level_to_search : 
-            level in which we want ot find the element
+        elem : int
+            element for which we want to find its assigned level in the HNSW structure
         
         Returns
         -------
-        the found position of the element at the specific level
+            the found belonging level of elem
         """
         for dic, i in zip(
             reversed(self.positions), reversed(range(len(self.positions)))
@@ -442,7 +443,7 @@ class PARALLEL_HNSW:
         k : int, optional
             the number of closest neighbors to find, default None
         ef : int, optional
-            number of closest neighbors of the inserted element in the layer, default None
+            number of candidate closest neighbors of the inserted element in the layer, default None
 
         Returns
         -------
@@ -522,7 +523,7 @@ class PARALLEL_HNSW:
 
     def _search_graph_test(self, q, ep, g, ef):
         """Function used to find the candidates neighbors 
-        of the element to be linked with the real ef value 
+        of the element to be linked with the elem.
         when we want to perform the accuracy test
 
         Parameters
@@ -661,7 +662,7 @@ class PARALLEL_HNSW:
         ef,
     ):
         """Function used to find the candidates neighbors 
-        of the element to be linked with the real ef value.
+        of the element to be linked with the elem.
 
         Parameters
         ----------
@@ -672,19 +673,19 @@ class PARALLEL_HNSW:
         q : int
             the element for which find its candidates to be linked to it
         ep : heap
-            the heap of entry points from which starts the search fo the candidates
+            the heap of entry points from which starts the search of the candidates
         dist : func
             the distance function
         arr_adj : shared numpy array
-            the current shared array of the nodes in level we are processing
+            the current shared array of the nodes in the level we are processing
         shm_adj : shared memory
             the current shared memory associated to the shared array of the nodes
         distance_cache : dict
-            cache of the distances computed between the element i and the others elements
+            cache of the distances computed between the element and the others elements
         m : int, optional
-            the number of each element's neighbros at the level > 0, default 5
+            the number of each element's neighbors at the level > 0, default 5
         ef : int, optional
-            number of closest neighbors of the inserted element in the layer
+            number of candidates closest neighbors of the inserted element in the layer
     
         Returns
         -------
@@ -743,22 +744,22 @@ class PARALLEL_HNSW:
         heap=False,
     ):
         """Function to select and link the right neighbors
-        to the current element to be inserted, with the usage of a heuristic.
+        to the current element to be inserted, with the usage of an heuristic.
 
         Parameters
         ----------
         level_to_search : int
-            level to search the neighbor of the elem
+            level to search the neighbors of the elem
         position : int
             the position of the element in the considered level
         to_insert: heap
             heap of elements to be linked
         m : int
-            the number of each element's neighbros 
+            the number of each element's neighbors 
         arr_adj : shared numpy array
-            the current shared array of the nodes in level we are processing
+            the current shared array of the nodes in the level we are processing
         arr_weights : shared numpy array
-            the current shared array of the weights in level we are processing
+            the current shared array of the weights in the level we are processing
         shm_adj : shared memory
             the current shared memory associated to the shared array of the nodes
         shm_weights : shared memory
@@ -854,7 +855,7 @@ class PARALLEL_HNSW:
         Parameters
         ----------
         distances : list[dict]
-            element for which we want to find its position in the HNSW structure
+            list of all the distance caches associated the points
         points : 
             the range of points for which we have to calculate the local mst
         
@@ -907,12 +908,12 @@ class PARALLEL_HNSW:
 
     def global_mst(self, candidate_edges, n):
         """Function that computes the global MST, 
-        based on the previous computed local MSTs
+        based on the previous computed local MSTs, using Kruskal algorithm
 
         Parameters
         ----------
         candidates_edges : list[tuple]
-           the candidate edges for the global mst, namely the partial local MST
+           the candidate edges for the global mst, namely the partial local MSTs
         n : int
             the size used by the kruskal UnionFind 
         

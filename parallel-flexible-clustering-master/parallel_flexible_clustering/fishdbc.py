@@ -79,11 +79,11 @@ class FISHDBC:
     d : func
         the dissimilarity function
     min_samples : int, optional
-        controls the minimum number of samples in a neighborhood for a point to be considered a core point, default 5
+        controls the minimum number of samples in a point's neighborhood to be considered a core point, default 5
     m : int, optional
-        the number of each element's neighbros at the level > 0, default 5
+        the number of each element's neighbors at the level > 0, default 5
     ef : int, optional
-        number of closest neighbors of the inserted element in the layer
+        number of candidates closest neighbors of the inserted element in the layer
     m0 : int, optional
         the max number of each element's neighbors at the level 0, default None
     level_mult : bool, optional
@@ -98,7 +98,7 @@ class FISHDBC:
     Methods
     -------
     add(elem)
-        Prints the animals name and what sound it makes
+        add an element to the HNSW and data we are clustering
     update(elems, mst_update_rate=1000000)
         Start the add procedure and the MST computation
     update_mst()
@@ -130,7 +130,7 @@ class FISHDBC:
         dissimilarity function. min_samples is passed to hdbscan, and
         the other parameters are all passed to HNSW.
 
-        The decorated_d internal function is used to compute the distance between element 
+        The decorated_d internal function is used to compute the distance between element, 
         but also to save distance values in cache
 
         Parameters
@@ -138,17 +138,17 @@ class FISHDBC:
         d : func
             the dissimilarity function
         min_samples : int, optional
-            controls the minimum number of samples in a neighborhood for a point to be considered a core point, default 5
+            controls the minimum number of samples in a point's neighborhood to be considered a core point, default 5
         m : int, optional
-            the number of each element's neighbros at the level > 0, default 5
+            the number of each element's neighbors at the level > 0, default 5
         ef : int, optional
-            number of closest neighbors of the inserted element in the layer
+            number of candidates closest neighbors of the inserted element in the layer
         m0 : int, optional
             the max number of each element's neighbors at the level 0, default None
         level_mult : bool, optional
           specify the level multiplier to normalize the probability to assign an element to a layer, default False
         heuristic : bool, optional
-            used to enable the select_heuristic funtion instead of the select_naive function, default False
+            used to enable the select_heuristic function instead of the select_naive function, default False
         balanced_add : bool, optional
             used to enable the balance_add function instead of the classical add function, default False
         vectorized: bool, optional
@@ -234,7 +234,7 @@ class FISHDBC:
         Parameters
         ----------
         elem: int
-            the element to add both to the hnsw and the data we are clustering
+            the element to be added both to the hnsw and the data we are clustering
         """
 
         data = self.data
@@ -293,7 +293,7 @@ class FISHDBC:
         Parameters
         ----------
         elems:
-             the list of elements to add to the hnsw and to the data we are clustering
+             the list of elements to be added to the hnsw and to the data we are clustering
         mst_update_rate: int
              update  the mst every mst_update_rate
         """
@@ -357,7 +357,7 @@ class FISHDBC:
         mst: np array
             the mst to be used as input for clustering, default None
         min_cluster_size: int
-             controls the minimum number of samples in a neighborhood for a point to be considered a core point, default None
+            controls the minimum number of samples in a point's neighborhood to be considered a core point, default None
         cluster_selection_method: str
             used to extract a flat clustering from the hierarchical clustering, default eom
         allow_single_cluster: bool

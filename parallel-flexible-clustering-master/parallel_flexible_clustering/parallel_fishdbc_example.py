@@ -31,7 +31,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 """This script runs an example of the parallel FISHDBC example,
-but you can also run the classical original single pricess FISHDBC.
+but you can also run the classical original single process FISHDBC.
 
 Functions:
 
@@ -128,7 +128,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     def plot_cluster_result(size, ctree, x, y, labels):
-        """Function to generate a centroid for the text dataset generation
+        """Function to plot the resulting clusters
         Parameters
         ----------
         size: int
