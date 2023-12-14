@@ -4,6 +4,10 @@
 Functions:
 
     * split - split the dataset in a number of ranges as the number of processes
+    * create_levels - assign for each point its level
+    * create_members - create in the correct way each level of the HNSW
+    * create_positions - assign for each element its position inside a level
+    * compute_HNSW_accuracy - computes the HNSW accuracy between the  multi-process HNSW parallel version and a classical KNN search 
     * main - the main function of the scripts that, if you execute it, starts or the parallel HNSW
 """
 import numpy as np
@@ -28,8 +32,6 @@ except ImportError:  # Python 2.x or <= 3.2
 
     def log2(x):
         return log(x, 2)
-
-
 # importlib.reload(fishdbc)
 MISSING = sys.maxsize
 MISSING_WEIGHT = sys.float_info.max
@@ -42,7 +44,7 @@ def split(a, n):
     ----------
     a : list
         the list of input data points
-    n : 
+    n : int
         the number of processes
     Returns
     -------
@@ -52,6 +54,124 @@ def split(a, n):
     indices = [k * i + min(i, m) for i in range(n + 1)]
     return [a[l:r] for l, r in pairwise(indices)]
 
+def create_levels(data):
+    """Function used to assign for each point its level
+
+    Parameters
+    ----------
+    data : np array
+           the input data set
+    Returns
+    -------
+    levels : list of tuple
+        the level of each point
+    """
+    levels = [(int(-log2(random()) * (1 / log2(m))) + 1) for _ in range(len(data))]
+    levels = sorted(enumerate(levels), key=lambda x: x[1])
+    return levels
+
+def create_members(levels):  
+    """Function used to create in the correct way each level of the HNSW
+
+    Parameters
+    ----------
+    levels : list of tuple
+           the level of each point
+    Returns
+    -------
+    members : list of list
+        the composition of each level of the HNSW
+    """
+    members = [[]]
+    j = 1
+    level_j = []
+    for i in levels:
+        elem, level = i
+        if level > j:
+            members.append(level_j)
+            level_j = []
+            j = j + 1
+        level_j.append(elem)
+        if j - 1 > 0:
+            for i in range(j - 1, 0, -1):
+                members[i].append(elem)
+    members.append(level_j)
+    for i, l in zip(range(len(members)), members):
+        sort = sorted(l)
+        members[i] = sort
+    del members[0]
+    return members
+
+def create_positions(members):
+    """Function used to assign for each element its position inside a level
+
+    Parameters
+    ----------
+    members : list of list
+           the composition of each level of the HNSW
+    Returns
+    -------
+    positions : list of dictionares
+        the positions of each element in the various levels
+    """
+    positions = []
+    for el, l in zip(members, range(len(members))):
+        positions.append({})
+        for i, x in enumerate(el):
+            positions[l][x] = i
+    return positions
+
+def compute_HNSW_accuracy(tot_adjs, tot_weights, X, Y):
+    """Function to compute the HNSW accuracy between the  multi-process HNSW parallel version and a classical KNN search 
+
+    Parameters
+    ----------
+    tot_adjs : list[numpy arrays]
+            list of bidimensional numpy arrays representing for each level and for each point the edges to the k neighbors 
+    tot_weights : list[numpy arrays]
+            list of bidimensional numpy arrays representing for each level and for each point the weights of edges to the k neighbors 
+    X : numpy array
+        the dataset over performing the search
+    Y : numpy array
+        the test element to search inside the X
+    Returns
+    -------
+    diff_el_par : int
+            the number of error
+
+    """
+    graphs_par = []
+    for adjs, weights, i in zip(tot_adjs, tot_weights, range(len(tot_adjs))):
+        dic = {}
+        for adj, weight, pos in zip(adjs, weights, range(len(adjs))):
+            dic2 = {}
+            for a, w in zip(adj, weight):
+                if a == MISSING:
+                    continue
+                dic2[a] = w
+            idx = list(positions[i].keys())[list(positions[i].values()).index(pos)]
+            dic[idx] = dic2
+        graphs_par.append(dic)
+
+        kdt = KDTree(X, leaf_size=30, metric="euclidean")
+        knn_result = kdt.query(Y, k=5, return_distance=True)
+        search_res_par = [hnswPar.search(graphs_par, i, 5) for i in Y]
+        # # compute the quality of the search results over the two hnsw with respect to a knn on a kdTree
+        diff_el_par = 0
+        diff_dist_par = 0
+        for i, j, el_par in zip(
+            knn_result[1],
+            knn_result[0],
+            search_res_par,
+        ):
+            for n1, d1, t_par in zip(i, j, el_par):
+                n_par, d_par = t_par
+                if n1 != n_par:
+                    diff_el_par += 1
+                if d1 != d_par:
+                    diff_dist_par += 1
+        return diff_el_par
+        
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -181,36 +301,10 @@ if __name__ == "__main__":
     multiprocessing.set_start_method("fork")
 
     start = time.time()
-    levels = [(int(-log2(random()) * (1 / log2(m))) + 1) for _ in range(len(data))]
-    levels = sorted(enumerate(levels), key=lambda x: x[1])
-    members = [[]]
-    # insert the point in the list corresponding to the right level
-    j = 1
-    level_j = []
-    for i in levels:
-        elem, level = i
-        if level > j:
-            members.append(level_j)
-            level_j = []
-            j = j + 1
-        level_j.append(elem)
-        if j - 1 > 0:
-            for i in range(j - 1, 0, -1):
-                members[i].append(elem)
-    members.append(level_j)
-    for i, l in zip(range(len(members)), members):
-        sort = sorted(l)
-        members[i] = sort
-    del members[0]
-    # print("Members: ", members, "\n")
+    levels = create_levels(data)
+    members = create_members(levels)
+    positions = create_positions(members)
 
-    # create a list of dict to associate for each point in each levels its position
-    positions = []
-    for el, l in zip(members, range(len(members))):
-        positions.append({})
-        for i, x in enumerate(el):
-            positions[l][x] = i
-    # print("Positions: ", positions, "\n")
     # create the buffer of shared memory for each levels
     shm_hnsw_data = multiprocessing.shared_memory.SharedMemory(
         create=True, size=1000000000
@@ -236,7 +330,7 @@ if __name__ == "__main__":
     manager = multiprocessing.Manager()
     lock = manager.Lock()
     # create the hnsw parallel class object and execute with pool the add function in multiprocessing
-    hnswPar = hnsw_parallel.HNSW(
+    hnswPar = hnsw_parallel.PARALLEL_HNSW(
         calc_dist,
         data,
         members,
@@ -287,38 +381,8 @@ if __name__ == "__main__":
         print(
             "-------------------------- HNSW ACCURACY RESULTS --------------------------"
         )
-
-        graphs_par = []
-        for adjs, weights, i in zip(tot_adjs, tot_weights, range(len(tot_adjs))):
-            dic = {}
-            for adj, weight, pos in zip(adjs, weights, range(len(adjs))):
-                dic2 = {}
-                for a, w in zip(adj, weight):
-                    if a == MISSING:
-                        continue
-                    dic2[a] = w
-                idx = list(positions[i].keys())[list(positions[i].values()).index(pos)]
-                dic[idx] = dic2
-            graphs_par.append(dic)
-
         X = data
-        kdt = KDTree(X, leaf_size=30, metric="euclidean")
-        knn_result = kdt.query(Y, k=5, return_distance=True)
-        search_res_par = [hnswPar.search(graphs_par, i, 5) for i in Y]
-        # # compute the quality of the search results over the two hnsw with respect to a knn on a kdTree
-        diff_el_par = 0
-        diff_dist_par = 0
-        for i, j, el_par in zip(
-            knn_result[1],
-            knn_result[0],
-            search_res_par,
-        ):
-            for n1, d1, t_par in zip(i, j, el_par):
-                n_par, d_par = t_par
-                if n1 != n_par:
-                    diff_el_par += 1
-                if d1 != d_par:
-                    diff_dist_par += 1
+        diff_el_par = compute_HNSW_accuracy(tot_adjs, tot_weights, X, Y)
         print(
             "Number of error during search between parallel version and state-of-the-art,",
             diff_el_par,
