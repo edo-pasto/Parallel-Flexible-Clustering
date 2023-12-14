@@ -37,6 +37,10 @@ Functions:
 
     * plot_cluster_result - plot the clustering result
     * split - split the dataset in a number of ranges as the number of processes
+    * create_levels - assign for each point its level
+    * create_members - create in the correct way each level of the HNSW
+    * create_positions - assign for each element its position inside a level
+    * compute_FISHDBC_accuracy - computes the FISHDBC clustering accuracy between the multi-process FISHDBC parallel version and the original labels of the orginal synthetic dataset 
     * main - the main function of the scripts that, if you execute it, starts or the parallel FISHDBC or the single process FISHDBC
 """
 
@@ -74,6 +78,177 @@ except ImportError:  # Python 2.x or <= 3.2
 
 MISSING = sys.maxsize
 MISSING_WEIGHT = sys.float_info.max
+
+def create_levels(data):
+    """Function used to assign for each point its level
+
+    Parameters
+    ----------
+    data : np array
+           the input data set
+    Returns
+    -------
+    levels : list of tuple
+        the level of each point
+    """
+    levels = [(int(-log2(random()) * (1 / log2(m))) + 1) for _ in range(len(data))]
+    levels = sorted(enumerate(levels), key=lambda x: x[1])
+    return levels
+
+def create_members(levels):  
+    """Function used to create in the correct way each level of the HNSW
+
+    Parameters
+    ----------
+    levels : list of tuple
+           the level of each point
+    Returns
+    -------
+    members : list of list
+        the composition of each level of the HNSW
+    """
+    members = [[]]
+    j = 1
+    level_j = []
+    for i in levels:
+        elem, level = i
+        if level > j:
+            members.append(level_j)
+            level_j = []
+            j = j + 1
+        level_j.append(elem)
+        if j - 1 > 0:
+            for i in range(j - 1, 0, -1):
+                members[i].append(elem)
+    members.append(level_j)
+    for i, l in zip(range(len(members)), members):
+        sort = sorted(l)
+        members[i] = sort
+    del members[0]
+    return members
+
+def create_positions(members):
+    """Function used to assign for each element its position inside a level
+
+    Parameters
+    ----------
+    members : list of list
+           the composition of each level of the HNSW
+    Returns
+    -------
+    positions : list of dictionares
+        the positions of each element in the various levels
+    """
+    positions = []
+    for el, l in zip(members, range(len(members))):
+        positions.append({})
+        for i, x in enumerate(el):
+            positions[l][x] = i
+    return positions
+
+def plot_cluster_result(size, ctree, x, y, labels):
+    """Function to plot the resulting clusters
+    Parameters
+    ----------
+    size: int
+        the size of the dataset
+    ctree : 
+        the condensed tree of the hiererchical clustering
+    labels : list
+        the labels of the resulting hiererchical clustering
+
+    """
+    plt.figure(figsize=(9, 9))
+    plt.gca().set_aspect("equal")
+    nknown = (
+        size  
+    )
+
+    clusters = collections.defaultdict(set)
+    for parent, child, lambda_val, child_size in ctree[::-1]:
+        if child_size == 1:
+            clusters[parent].add(
+                child
+            )  
+        else:
+            assert len(clusters[child]) == child_size
+            clusters[parent].update(
+                clusters[child]
+            )  
+    clusters = sorted(
+        clusters.items()
+    ) 
+    xknown, yknown, labels_known = x[:nknown], y[:nknown], labels[:nknown]
+    color = ["rgbcmyk"[l % 7] for l in labels_known]
+    plt.scatter(xknown, yknown, c=color, linewidth=0)
+    plt.show(block=False)
+    for _, cluster in clusters:
+        plt.waitforbuttonpress()
+        plt.gca().clear()
+        color = ["kr"[i in cluster] for i in range(nknown)]
+        plt.scatter(xknown, yknown, c=color, linewidth=0)
+        plt.draw()
+
+def split(a, n):
+    """Function used to split the input data in a number of range as the number of used processes
+
+    Parameters
+    ----------
+    a : list
+        the list of input data points
+    n : 
+        the number of processes
+    Returns
+    -------
+        the splitted range of points
+    """
+    k, m = divmod(len(a), n)
+    indices = [k * i + min(i, m) for i in range(n + 1)]
+    return [a[l:r] for l, r in pairwise(indices)]
+
+def compute_FISHDBC_accuracy(original_labels, resulting_labels):
+    """Function to compute the FISHDBC (paralell and single process) clustering accuracy between the multi-process FISHDBC parallel version and the original labels of the orginal synthetic dataset
+
+    Parameters
+    ----------
+    original_labels : list
+            the labels assigned to the original data items
+    resulting_labels : list
+            the labels assigned to the clusterized data items, after the FISHDBC 
+    """    
+    from sklearn.metrics.cluster import (
+                adjusted_mutual_info_score,
+                adjusted_rand_score,
+                rand_score,
+                normalized_mutual_info_score,
+                homogeneity_completeness_v_measure,
+            )
+    homogeneity, completness, v_measure = homogeneity_completeness_v_measure(
+        original_labels, resulting_labels
+    )
+    print(
+        "Adjsuted Mutual Info Score: ",
+        "{:.2f}".format(adjusted_mutual_info_score(original_labels, resulting_labels)),
+    )
+    print(
+        "Normalized Mutual Info Score: ",
+        "{:.2f}".format(
+            normalized_mutual_info_score(original_labels, resulting_labels)
+        ),
+    )
+    print(
+        "Adjusted Rand Score: ",
+        "{:.2f}".format(adjusted_rand_score(original_labels, resulting_labels)),
+    )
+    print(
+        "Rand Score: ", "{:.2f}".format(rand_score(original_labels, resulting_labels))
+    )
+    print(
+        "Homogeneity, Completness, V-Measure: ",
+        (homogeneity, completness, v_measure),
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Show an example of running FISHDBC."
@@ -126,67 +301,6 @@ if __name__ == "__main__":
         help="option to specify if we want to execute the parallel FISHDBC (specifying the number of processes from1 to 16) or single process FISHDBC (0 processes)",
     )
     args = parser.parse_args()
-
-    def plot_cluster_result(size, ctree, x, y, labels):
-        """Function to plot the resulting clusters
-        Parameters
-        ----------
-        size: int
-            the size of the dataset
-        ctree : 
-            the condensed tree of the hiererchical clustering
-        labels : list
-            the labels of the resulting hiererchical clustering
-
-        """
-        plt.figure(figsize=(9, 9))
-        plt.gca().set_aspect("equal")
-        nknown = (
-            size  
-        )
-    
-        clusters = collections.defaultdict(set)
-        for parent, child, lambda_val, child_size in ctree[::-1]:
-            if child_size == 1:
-                clusters[parent].add(
-                    child
-                )  
-            else:
-                assert len(clusters[child]) == child_size
-                clusters[parent].update(
-                    clusters[child]
-                )  
-        clusters = sorted(
-            clusters.items()
-        ) 
-        xknown, yknown, labels_known = x[:nknown], y[:nknown], labels[:nknown]
-        color = ["rgbcmyk"[l % 7] for l in labels_known]
-        plt.scatter(xknown, yknown, c=color, linewidth=0)
-        plt.show(block=False)
-        for _, cluster in clusters:
-            plt.waitforbuttonpress()
-            plt.gca().clear()
-            color = ["kr"[i in cluster] for i in range(nknown)]
-            plt.scatter(xknown, yknown, c=color, linewidth=0)
-            plt.draw()
-
-    def split(a, n):
-        """Function used to split the input data in a number of range as the number of used processes
-
-        Parameters
-        ----------
-        a : list
-            the list of input data points
-        n : 
-            the number of processes
-        Returns
-        -------
-            the splitted range of points
-        """
-        k, m = divmod(len(a), n)
-        indices = [k * i + min(i, m) for i in range(n + 1)]
-        return [a[l:r] for l, r in pairwise(indices)]
-
     dist = args.distance.lower()
     dataset = args.dataset
     parallel = int(args.parallel)
@@ -255,7 +369,7 @@ if __name__ == "__main__":
     # x, y = data[:, 0], data[:, 1]
     if parallel > 0:
         print(
-            "-------------------------- MULTI-PROCESS FISHDBC --------------------------"
+            "-------------------------- MULTI-PROCESS PARALLEL FISHDBC --------------------------"
         )
         start_tot = time.time()
         m = 5
@@ -264,39 +378,9 @@ if __name__ == "__main__":
         # should inherit the calc_distance function and the orignal dataset
         multiprocessing.set_start_method("fork")
 
-        # assign each element to a random level
-        levels = [(int(-log2(random()) * (1 / log2(m))) + 1) for _ in range(len(data))]
-        levels = sorted(enumerate(levels), key=lambda x: x[1])
-
-        # insert the point in the list corresponding to the right level
-        members = [[]]
-        j = 1
-        level_j = []
-        for i in levels:
-            elem, level = i
-            if level > j:
-                members.append(level_j)
-                level_j = []
-                j = j + 1
-            level_j.append(elem)
-            if j - 1 > 0:
-                for i in range(j - 1, 0, -1):
-                    members[i].append(elem)
-        members.append(level_j)
-        for i, l in zip(range(len(members)), members):
-            sort = sorted(l)
-            members[i] = sort
-        del members[0]
-
-        # create a list of dict to associate for each point in each levels its position
-        positions = []
-        for el, l in zip(members, range(len(members))):
-            positions.append({})
-            for i, x in enumerate(el):
-                positions[l][x] = i
-        # print("Levels: ",levels, "\n")
-        # print("Members: ",members, "\n")
-        # print("Positions: ",positions, "\n")
+        levels = create_levels(data)
+        members = create_members(levels)
+        positions = create_positions(members)
 
         # create the buffer of shared memory for each levels
         shm_hnsw_data = multiprocessing.shared_memory.SharedMemory(
@@ -419,42 +503,7 @@ if __name__ == "__main__":
         print("The time of execution of Parallel FISHDBC is :", time_parallelFISHDBC)
 
         if args.test == True:
-            from sklearn.metrics.cluster import (
-                adjusted_mutual_info_score,
-                adjusted_rand_score,
-                rand_score,
-                normalized_mutual_info_score,
-                homogeneity_completeness_v_measure,
-            )
-
-            AMI = adjusted_mutual_info_score(labels, labels_cluster_par)
-            NMI = normalized_mutual_info_score(labels, labels_cluster_par)
-            ARI = adjusted_rand_score(labels, labels_cluster_par)
-            RI = rand_score(labels, labels_cluster_par)
-            homogeneity, completness, v_measure = homogeneity_completeness_v_measure(
-                labels, labels_cluster_par
-            )
-            print(
-                "Adjsuted Mutual Info Score: ",
-                "{:.2f}".format(adjusted_mutual_info_score(labels, labels_cluster_par)),
-            )
-            print(
-                "Normalized Mutual Info Score: ",
-                "{:.2f}".format(
-                    normalized_mutual_info_score(labels, labels_cluster_par)
-                ),
-            )
-            print(
-                "Adjusted Rand Score: ",
-                "{:.2f}".format(adjusted_rand_score(labels, labels_cluster_par)),
-            )
-            print(
-                "Rand Score: ", "{:.2f}".format(rand_score(labels, labels_cluster_par))
-            )
-            print(
-                "Homogeneity, Completness, V-Measure: ",
-                (homogeneity, completness, v_measure),
-            )
+            compute_FISHDBC_accuracy(labels, labels_cluster_par)
 
         shm_hnsw_data.close()
         shm_hnsw_data.unlink()
@@ -492,38 +541,8 @@ if __name__ == "__main__":
             "{:.3f}".format(time_singleFISHDBC),
         )
         if args.test == True:
-            from sklearn.metrics.cluster import (
-                adjusted_mutual_info_score,
-                adjusted_rand_score,
-                rand_score,
-                normalized_mutual_info_score,
-                homogeneity_completeness_v_measure,
-            )
-
-            AMI = adjusted_mutual_info_score(labels, labels_cluster)
-            NMI = normalized_mutual_info_score(labels, labels_cluster)
-            ARI = adjusted_rand_score(labels, labels_cluster)
-            RI = rand_score(labels, labels_cluster)
-            homogeneity, completness, v_measure = homogeneity_completeness_v_measure(
-                labels, labels_cluster
-            )
-            print(
-                "Adjsuted Mutual Info Score: ",
-                "{:.2f}".format(adjusted_mutual_info_score(labels, labels_cluster)),
-            )
-            print(
-                "Normalized Mutual Info Score: ",
-                "{:.2f}".format(normalized_mutual_info_score(labels, labels_cluster)),
-            )
-            print(
-                "Adjusted Rand Score: ",
-                "{:.2f}".format(adjusted_rand_score(labels, labels_cluster)),
-            )
-            print("Rand Score: ", "{:.2f}".format(rand_score(labels, labels_cluster)))
-            print(
-                "Homogeneity, Completness, V-Measure: ",
-                (homogeneity, completness, v_measure),
-            )
+            compute_FISHDBC_accuracy(labels, labels_cluster)
+            
         print(
             "___________________________________________________________________________________________\n"
         )
