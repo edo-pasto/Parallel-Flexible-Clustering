@@ -807,7 +807,7 @@ class PARALLEL_FISHDBC:
                 tempList1.append(prioritize(idx, -mdist))
             to_insert = nsmallest(m, tempList1)
 
-        # assert len(to_insert) > 0
+        assert len(to_insert) > 0
         assert not any(
             idx in g_adj[position] for _, _, idx in to_insert
         ), "idx:{0}".format(
