@@ -94,7 +94,7 @@ If you want to execute a classical run of the parallel FISHDBC you should type:
 ```
 python3 parallel_fishdbc_example.py --dataset blob --nitems 10000 --centers 5 --distance euclidean --parallel 16
 ```
-where you can specify the data set that you want to use as input (blob or text), the number of items of the input data set (--nitems), the numbers of the data set's centroids (--centers), depending on the type of data the distance to be used (the available distances are: euclidean, sqeuclidean, minkowski, cosine and levenshtein for text data) and the number of processes to use (--parallel 0 means original single process FISHDBC, --parallel > 0 means multi process, you can pass from 1 to 16 processes).    
+where you can specify the data set that you want to use as input (blob or text), the number of items of the input data set (--nitems), the numbers of the data set's centroids (--centers), depending on the type of data the distance to be used (the available distances are: euclidean, sqeuclidean, minkowski, cosine for blob data, and levenshtein for text data) and the number of processes to use (--parallel 1 means original single process FISHDBC, --parallel > 1 means multi process, you can pass from 1 to 16 processes).    
 If you want to execute the parallel FISHDBC with text data as input you can write:
 ```
 python3 parallel_fishdbc_example.py --dataset text --distance levenshtein --nitems 1000 --centers 10 --parallel 16
