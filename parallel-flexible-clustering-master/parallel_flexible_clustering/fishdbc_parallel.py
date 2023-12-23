@@ -2,7 +2,7 @@ from __future__ import division
 from __future__ import print_function
 
 from heapq import heapify, heappop, heappush, heapreplace, nlargest, nsmallest
-from operator import itemgetter
+# from operator import itemgetter
 import numpy as np
 import sys
 import time
@@ -23,7 +23,7 @@ MISSING = sys.maxsize
 MISSING_WEIGHT = sys.float_info.max
 
 
-class PARALLEL_HNSW:
+class PARALLEL_FISHDBC:
     """Parallel Hierarchical Navigable Small World (HNSW) data structure.
     Based on the work by Yury Malkov and Dmitry Yashunin, available at
     http://arxiv.org/pdf/1603.09320v2.pdf

@@ -2,3 +2,5 @@ parallel-flexible-clustering-master/test/
 ParallelFlexibleClustering.pdf
 parallel-flexible-clustering-master/build/
 parallel-flexible-clustering-master/dist/
+parallel-flexible-clustering-master/parallel_flexible_clustering.egg-info/
+parallel-flexible-clustering-master/parallel_flexible_clustering/__pycache__

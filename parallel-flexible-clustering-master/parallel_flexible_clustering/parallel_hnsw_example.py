@@ -8,6 +8,9 @@ Functions:
     * create_members - create in the correct way each level of the HNSW
     * create_positions - assign for each element its position inside a level
     * compute_HNSW_accuracy - computes the HNSW accuracy between the  multi-process HNSW parallel version and a classical KNN search 
+    * make_texts - creates the synthetic text dataset
+    * check_range_nitems - checks if the number of dataset's items is in the correct range
+    * check_range_centers - checks if the number of centers is in the correct range
     * main - the main function of the scripts that, if you execute it, starts or the parallel HNSW
 """
 import numpy as np
@@ -16,7 +19,7 @@ import argparse
 from numba import njit
 from scipy.spatial import distance, KDTree
 from Levenshtein import distance as lev
-from parallel_flexible_clustering import hnsw_parallel
+from parallel_flexible_clustering import fishdbc_parallel
 import create_text_dataset
 import sklearn.datasets
 from sklearn.neighbors import KDTree
@@ -172,69 +175,139 @@ def compute_HNSW_accuracy(tot_adjs, tot_weights, X, Y):
                     diff_dist_par += 1
         return diff_el_par
         
+def make_texts(centers, nitems):
+    """Function to create the text dataset using the specific module
+
+    Parameters
+    ----------
+    centers : int
+        number of centroids
+    nitems : int
+        number of items 
+   
+    Returns
+    -------
+    data : list
+        the created text dataset
+    labels : list
+        the associated labels of the text dataset
+    """
+    realData = create_text_dataset.gen_dataset(centers, 20, nitems, 4)
+    labels = create_text_dataset.gen_labels(centers, nitems)
+
+    data = np.array(realData[0]).reshape(-1, 1)
+    labels = np.asarray(labels).reshape(-1, 1)
+
+    shuffled_indices = np.arange(len(data))
+    np.random.shuffle(shuffled_indices)
+
+    # Use the shuffled indices to rearrange both elements and labels
+    data = data[shuffled_indices]
+    labels = labels[shuffled_indices]
+    labels = [item for sublist in labels for item in sublist]
+
+    return data, labels
+
+def check_range_nitems(value):
+    """Function to check if the number of dataset's items is in the correct range
+
+    Parameters
+    ----------
+    value : int
+        value to check if it is between the max and min values allowed
+   
+    Returns
+    -------
+    ivalue : int
+        the same value if it passes the check
+    """
+    ivalue = int(value)
+    if ivalue < 10 or ivalue > 1000000:
+        raise argparse.ArgumentTypeError(f"{value} is not in the range 10-1000000")
+    return ivalue
+
+def check_range_centers(value):
+    """Function to check if the number of centers is in the correct range
+
+    Parameters
+    ----------
+    value : int
+        value to check if it is between the max and min values allowed
+   
+    Returns
+    -------
+    ivalue : int
+        the same value if it passes the check
+    """
+    ivalue = int(value)
+    if ivalue < 1 or ivalue > 50:
+        raise argparse.ArgumentTypeError(f"{value} is not in the range 1-50")
+    return ivalue
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Show an example of running FISHDBC."
-        "This will plot points that are naturally clustered and added incrementally,"
-        "and then loop through all the hierarchical clusters recognized by the algorithm."
-        "Original clusters are shown in different colors while each cluster found by"
-        "FISHDBC is shown in red; press a key or click the mouse button to loop through clusters."
+        description="Show an example of running parallel HNSW."
     )
 
     parser.add_argument(
         "--dataset",
         type=str,
         default="blob",
+        choices={"blob","text"},
         help="dataset used by the algorithm (default: blob)." "try with: blob, string,",
     )
     parser.add_argument(
         "--distance",
         type=str,
         default="euclidean",
-        help="distance metrix used by FISHDBC (default: hamming)."
-        "try with: euclidean, squeclidean, cosine, dice, minkowsky, jaccard, hamming, jensenShannon, levensthein",
+        choices={"euclidean", "sqeuclidean", "cosine", "minkowsky", "levenshtein"},
+        help="distance metrix used by FISHDBC (default: euclidean)."
+        "try with: euclidean, squeclidean, cosine, minkowsky, levenshtein",
     )
     parser.add_argument(
-        "--nitems", type=int, default=10000, help="Number of items (default 10000)."
+        "--nitems", type=check_range_nitems, default=10000, help="Number of items (default 10000)."
     )
     parser.add_argument(
         "--niters",
         type=int,
         default=2,
+        choices=range(1, 11),
         help="Clusters are shown in NITERS stage while being "
-        "added incrementally (default 4).",
+        "added incrementally (default 2).",
     )
     parser.add_argument(
         "--centers",
-        type=int,
+        type=check_range_centers,
         default=5,
         help="Number of centers for the clusters generated " "(default 5).",
     )
     parser.add_argument(
         "--parallel",
-        type=str,
-        default="16",
-        help="option to specify if we want to execute the parallel FISHDBC (specifying the number of processes from1 to 16) or single process FISHDBC (0 processes)",
+        type=int,
+        default=16,
+        choices=range(1,17),
+        help="option to specify if we want to execute the parallel HNSW (specifying the number of processes from 1 to 16)",
     )
     parser.add_argument(
         "--test",
-        type=bool,
-        default=False,
-        help="Option to say to perform HNSW accuracy test, works only with blob dataset and euclidean distance "
+        type=str,
+        default="False",
+        choices={"True", "False"},
+        help="Option to say to perform HNSW accuracy test, works only with blob dataset and euclidean distance"
         "(default False).",
     )
     args = parser.parse_args()
     dist = args.distance.lower()
-    dataset = args.dataset
+    dataset = args.dataset.lower()
     parallel = int(args.parallel)
+    test = True if args.test == "True" else False
 
     if dataset == "blob":
         # create the input dataset, data element for creating the hnsw, Y element for testing the search over it
         data, labels = sklearn.datasets.make_blobs(
             args.nitems, centers=args.centers, random_state=10
         )
-        if args.test == True and dist == "euclidean":
+        if test == True and dist == "euclidean":
             np.random.shuffle(data)
             ten_percent_index = int(0.1 * len(data))
             print(ten_percent_index)
@@ -271,16 +344,7 @@ if __name__ == "__main__":
             )
 
     elif dataset == "text":
-        realData = create_text_dataset.gen_dataset(args.centers, 20, args.nitems, 4)
-        labels = create_text_dataset.gen_labels(args.centers, args.nitems)
-        data = np.array(realData[0]).reshape(-1, 1)
-        labels = np.asarray(labels).reshape(-1, 1)
-        shuffled_indices = np.arange(len(data))
-        np.random.shuffle(shuffled_indices)
-        # Use the shuffled indices to rearrange both elements and labels
-        data = data[shuffled_indices]
-        labels = labels[shuffled_indices]
-        labels = [item for sublist in labels for item in sublist]
+        data, labels = make_texts(args.centers, args.nitems)
         # if dist == 'hamming':
         #     def calc_dist(x,y):
         #         return distance.hamming(x,y)
@@ -291,7 +355,7 @@ if __name__ == "__main__":
 
         else:
             raise EnvironmentError(
-                "At the moment the specified distance is not available for the string dataset,"
+                "At the moment the specified distance is not available for the text dataset,"
                 " try with: levenshtein"
             )
     m = 5
@@ -330,7 +394,7 @@ if __name__ == "__main__":
     manager = multiprocessing.Manager()
     lock = manager.Lock()
     # create the hnsw parallel class object and execute with pool the add function in multiprocessing
-    hnswPar = hnsw_parallel.PARALLEL_HNSW(
+    hnswPar = fishdbc_parallel.PARALLEL_FISHDBC(
         calc_dist,
         data,
         members,
@@ -377,7 +441,7 @@ if __name__ == "__main__":
         tot_weights.append(weight)
     # print(tot_adjs, "\n", tot_weights, "\n")
 
-    if args.test == True and dataset == "blob" and dist == "euclidean":
+    if test == True and dataset == "blob" and dist == "euclidean":
         print(
             "-------------------------- HNSW ACCURACY RESULTS --------------------------"
         )
